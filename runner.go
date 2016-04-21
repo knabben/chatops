@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 
 	"encoding/json"
@@ -87,7 +89,7 @@ func StartQueueConsumer(amqpURI string, queueName string) (*Consumer, error) {
 	)
 	failOnError(err, "Failed trying to consuming the queue")
 
-	go handle(deliveries, c.done)
+	go handle(deliveries, *c)
 
 	return c, nil
 }
@@ -96,36 +98,75 @@ func ErrorOnResponseQueue(msg string) {
 	fmt.Println(msg)
 }
 
-func (e Event) decodeBody(body []byte) {
-	err := json.Unmarshal(body, &e)
+func decodeBody(body []byte) (e Event) {
+	var event Event
+	err := json.Unmarshal(body, &event)
 	if err != nil {
 		fmt.Println("ERROR %s", err)
 	}
+	return event
 }
 
-func handle(deliveries <-chan amqp.Delivery, done chan error) {
+func handle(deliveries <-chan amqp.Delivery, c Consumer) {
 	client, _ := docker.NewClient(*endpoint)
 
 	for d := range deliveries {
-		found := false
+		e := decodeBody(d.Body)
 
-		containers, _ := client.ListContainers(docker.ListContainersOptions{})
-		for _, c := range containers {
-			if c.Names[0] == "/worker" {
-				// We found our worker
-				err := client.StartContainer("worker", &docker.HostConfig{})
-				if err != nil {
-					ErrorOnResponseQueue(err.Error())
-				}
-				found = true
+		// Removing old container
+		client.RemoveContainer(docker.RemoveContainerOptions{
+			ID:    e.Cmd,
+			Force: true,
+		})
+
+		host_config := docker.HostConfig{}
+		opts := docker.CreateContainerOptions{
+			Name: e.Cmd,
+			Config: &docker.Config{
+				Image: "debian",
+				Cmd:   []string{e.Params},
+			},
+			HostConfig: &host_config,
+		}
+		// Creating a new container
+		cont, _ := client.CreateContainer(opts)
+
+		// Starting the container
+		client.StartContainer(cont.Name, &host_config)
+
+		reader, writer := io.Pipe()
+
+		// Output send to Pipe
+		go client.AttachToContainer(docker.AttachToContainerOptions{
+			Container:    cont.Name,
+			OutputStream: writer,
+			Logs:         true,
+			Stdout:       true,
+		})
+
+		// Consume output and send to a new queue
+		go func(reader io.Reader) {
+			scanner := bufio.NewScanner(reader)
+			ch, err := c.conn.Channel()
+			if err != nil {
+				ErrorOnResponseQueue(err.Error())
 			}
-		}
 
-		if !found {
-			ErrorOnResponseQueue("Worker container not found, try to create it before starting!")
-		}
+			q, err := ch.QueueDeclare("response", true, false, false, false, nil)
+			if err != nil {
+				ErrorOnResponseQueue(err.Error())
+			}
+			for scanner.Scan() {
+				ch.Publish("", q.Name, false, false, amqp.Publishing{
+					ContentType: "text/plain",
+					Body:        []byte(scanner.Text()),
+				})
+			}
+
+		}(reader)
+
 		d.Ack(true)
 	}
 	log.Printf("handle: deliveries channel closed")
-	done <- nil
+	c.done <- nil
 }

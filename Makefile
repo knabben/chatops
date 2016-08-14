@@ -11,3 +11,6 @@ hubot-run:
 	docker run --rm -e HUBOT_SLACK_TOKEN=${HUBOT_SLACK_TOKEN} \
 	--link rabbit:rabbit --name hubot -e \
 	 RABBITMQ_URL="amqp://guest:guest@rabbit/" hubot:latest
+
+compile:
+	go run main.go consume

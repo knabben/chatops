@@ -3,12 +3,11 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"github.com/spf13/cobra"
 	"github.com/streadway/amqp"
+	"io/ioutil"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-
 )
 
 var Uri string
@@ -30,7 +29,7 @@ type Event struct {
 var consumeCmd = &cobra.Command{
 	Use:   "consume",
 	Short: "Consume messages from AMQP and start Kubernetes Jobs",
-	Long: `Consume messages from AMQP and start Kubernetes Jobs`,
+	Long:  `Consume messages from AMQP and start Kubernetes Jobs`,
 	Run: func(cmd *cobra.Command, args []string) {
 		QueueConsumer()
 		select {}
@@ -38,73 +37,76 @@ var consumeCmd = &cobra.Command{
 }
 
 func QueueConsumer() {
-	c := &Consumer{
-		conn: nil,
-		channel: nil,
-		done: make(chan error),
-	}
 	var err error
+	consumer := &Consumer{
+		conn:    nil,
+		channel: nil,
+		done:    make(chan error),
+	}
 
 	// Start connection
-	c.conn, err = amqp.Dial(Uri)
+	consumer.conn, err = amqp.Dial(Uri)
 	if err != nil {
-		fmt.Printf("Dial: %s", err)
+		fmt.Printf("ERROR: on connection %s", err)
 	}
 
-	// Get channel from connection
-	c.channel, err = c.conn.Channel()
-	queue, err := c.channel.QueueDeclare(
+	// Create a channel and declare a queue to consume from
+	consumer.channel, err = consumer.conn.Channel()
+	queue, err := consumer.channel.QueueDeclare(
 		"runner", true, false, false, false, nil,
 	)
 	if err != nil {
-		fmt.Println("No queue declare")
+		fmt.Println("ERROR: on runner queue declare")
 	}
-
-	// Consume it as go channel
-	deliveries, err := c.channel.Consume(
+	deliveries, err := consumer.channel.Consume(
 		queue.Name, "", false, false, false, false, nil,
 	)
-	go handle(deliveries, *c)
+	if err != nil {
+		fmt.Println("ERROR: trying to consume runner")
+	}
+	go handle(deliveries, *consumer)
 }
-
 
 func decodeBody(body []byte) (e Event) {
 	var event Event
 	err := json.Unmarshal(body, &event)
 	if err != nil {
-		fmt.Println("ERROR %s", err)
+		fmt.Println("ERROR: decoding body - %s", err)
 	}
 	return event
 }
 
+func handle(deliveries <-chan amqp.Delivery, consumer Consumer) {
+	var podName string = "script"
 
-func handle(deliveries <-chan amqp.Delivery, c Consumer) {
 	ca, err := ioutil.ReadFile(KubeCA)
 	if err != nil {
-		fmt.Println("Error opening the CA file", err)
+		fmt.Println("ERROR: opening the CA file", err)
 	}
 	token, err := ioutil.ReadFile(KubeToken)
 	if err != nil {
-		fmt.Println("Error opening the TOKEN file")
+		fmt.Println("ERROR: opening the TOKEN file")
 	}
 
 	config := &restclient.Config{
-		Host: KubeHost,
+		Host:            KubeHost,
 		TLSClientConfig: restclient.TLSClientConfig{CAData: ca},
-		BearerToken: string(token[:]),
+		BearerToken:     string(token[:]),
 	}
 	kubeClient, err := client.New(config)
 	if err != nil {
-		fmt.Println("Can't connect on Kubernetes server: ", err)
+		fmt.Println("ERROR: Can't connect on Kubernetes server ", err)
 	}
 
-	for d := range deliveries {
-		createJob(kubeClient)
-		e := decodeBody(d.Body)
-		fmt.Println(e.Cmd)
-		d.Ack(true)
+	// Consume messages and run the pods
+	for msg := range deliveries {
+		body := decodeBody(msg.Body)
+		createPod(kubeClient, body, podName)
+		ReadLogAndPublish(kubeClient, consumer, podName)
+		deletePod(kubeClient, podName)
+		msg.Ack(true)
 	}
-	c.done <- nil
+	consumer.done <- nil
 }
 
 func init() {

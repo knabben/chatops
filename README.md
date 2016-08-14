@@ -1,3 +1,44 @@
+RUNNER
+===
+
+For now we have no logic implemented on our program, it will consume the queue
+but it will probably complaint about this function:
+
+```
+createPod(kubeClient *client.Client, event Event, podName string) {
+    pod := &api.Pod{
+        ObjectMeta: api.ObjectMeta{
+            Name:      podName,
+            Namespace: ns,
+            Labels:    map[string]string{"name": podName},
+        },
+        Spec: api.PodSpec{
+            RestartPolicy: api.RestartPolicyOnFailure,
+            Containers: []api.Container{
+                {
+                    Name:  podName,
+                    Image: imgName,
+                    Args:  args,
+                    Env:   envVars,
+                },
+            },
+        },
+    }
+    _, err := kubeClient.Pods(ns).Create(pod)
+    ...
+}
+```
+
+You can run the consume command as follows:
+
+```
+make compile
+```
+
+TODO
+  * create from yaml file
+
+
 HUBOT
 ===
 

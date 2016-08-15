@@ -10,6 +10,38 @@ import (
 
 var ns = api.NamespaceDefault
 
+func createPod(kubeClient *client.Client, event Event, podName string) {
+	// TODO - Read everything from an YAML
+	var envVars []api.EnvVar = EnvVars()
+	args := []string{event.Cmd, event.Params}
+
+	// Pod specification
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      podName,
+			Namespace: ns,
+			Labels:    map[string]string{"name": podName},
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyOnFailure,
+			Containers: []api.Container{
+				{
+					Name:  podName,
+					Image: imgName,
+					Args:  args,
+					Env:   envVars,
+				},
+			},
+		},
+	}
+
+	// Run the pod and print error
+	_, err := kubeClient.Pods(ns).Create(pod)
+	if err != nil {
+		fmt.Println("ERROR: [%s] with %s", podName, err)
+	}
+}
+
 func ReadLogAndPublish(kubeClient *client.Client, consumer Consumer, podName string) {
 	channel, err := consumer.conn.Channel()
 	if err != nil {

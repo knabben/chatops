@@ -131,7 +131,7 @@ func handle(deliveries <-chan amqp.Delivery, consumer Consumer) {
 func init() {
 	RootCmd.AddCommand(consumeCmd)
 	consumeCmd.Flags().StringVar(&Uri, "uri", "amqp://guest:guest@localhost:5672", "AQMP default URI")
-	consumeCmd.Flags().StringVar(&KubeHost, "kubehost", "https://lo", "Kubernetes host")
+	consumeCmd.Flags().StringVar(&KubeHost, "kubehost", "https://kubernetes.default.svc.cluster.local", "Kubernetes host")
 	consumeCmd.Flags().StringVar(&KubeCA, "kubeca", "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", "Kubernetes CA")
 	consumeCmd.Flags().StringVar(&KubeToken, "kubetok", "/var/run/secrets/kubernetes.io/serviceaccount/token", "Kubernetes Token")
 }

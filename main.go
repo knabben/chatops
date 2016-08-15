@@ -2,7 +2,7 @@
 
 package main
 
-import "github.com/knabben/runner/cmd"
+import "github.com/knabben/chatops/cmd"
 
 func main() {
 	cmd.Execute()

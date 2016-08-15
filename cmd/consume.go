@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"time"
 )
 
 var Uri string
@@ -36,35 +37,53 @@ var consumeCmd = &cobra.Command{
 	},
 }
 
+func initRabbitConn(consumer Consumer) {
+	ticker := time.NewTicker(5 * time.Second)
+	quit := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				var err error
+				consumer.conn, err = amqp.Dial(Uri)
+				if err != nil {
+					fmt.Println(err)
+					fmt.Println("node will only be able to respond to local connections")
+					fmt.Println("trying to reconnect in 5 seconds...")
+				} else {
+					close(quit)
+
+					// Create a channel and declare a queue to consume from
+					consumer.channel, err = consumer.conn.Channel()
+					queue, err := consumer.channel.QueueDeclare(
+						"runner", true, false, false, false, nil,
+					)
+					if err != nil {
+						fmt.Println("ERROR: on runner queue declare")
+					}
+					deliveries, err := consumer.channel.Consume(
+						queue.Name, "", false, false, false, false, nil,
+					)
+					if err != nil {
+						fmt.Println("ERROR: trying to consume runner")
+					}
+					go handle(deliveries, consumer)
+				}
+			case <-quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+}
+
 func QueueConsumer() {
-	var err error
 	consumer := &Consumer{
 		conn:    nil,
 		channel: nil,
 		done:    make(chan error),
 	}
-
-	// Start connection
-	consumer.conn, err = amqp.Dial(Uri)
-	if err != nil {
-		fmt.Printf("ERROR: on connection %s", err)
-	}
-
-	// Create a channel and declare a queue to consume from
-	consumer.channel, err = consumer.conn.Channel()
-	queue, err := consumer.channel.QueueDeclare(
-		"runner", true, false, false, false, nil,
-	)
-	if err != nil {
-		fmt.Println("ERROR: on runner queue declare")
-	}
-	deliveries, err := consumer.channel.Consume(
-		queue.Name, "", false, false, false, false, nil,
-	)
-	if err != nil {
-		fmt.Println("ERROR: trying to consume runner")
-	}
-	go handle(deliveries, *consumer)
+	initRabbitConn(*consumer)
 }
 
 func decodeBody(body []byte) (e Event) {
@@ -113,6 +132,6 @@ func init() {
 	RootCmd.AddCommand(consumeCmd)
 	consumeCmd.Flags().StringVar(&Uri, "uri", "amqp://guest:guest@localhost:5672", "AQMP default URI")
 	consumeCmd.Flags().StringVar(&KubeHost, "kubehost", "https://lo", "Kubernetes host")
-	consumeCmd.Flags().StringVar(&KubeCA, "kubeca", "/var/run/secrets/kubernetes.io/serviceaccount/ca.pem", "Kubernetes CA")
+	consumeCmd.Flags().StringVar(&KubeCA, "kubeca", "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", "Kubernetes CA")
 	consumeCmd.Flags().StringVar(&KubeToken, "kubetok", "/var/run/secrets/kubernetes.io/serviceaccount/token", "Kubernetes Token")
 }

@@ -113,6 +113,6 @@ func init() {
 	RootCmd.AddCommand(consumeCmd)
 	consumeCmd.Flags().StringVar(&Uri, "uri", "amqp://guest:guest@localhost:5672", "AQMP default URI")
 	consumeCmd.Flags().StringVar(&KubeHost, "kubehost", "https://lo", "Kubernetes host")
-	consumeCmd.Flags().StringVar(&KubeCA, "kubeca", "/home/ubuntu/.kube/credentials/ca.pem", "Kubernetes CA")
-	consumeCmd.Flags().StringVar(&KubeToken, "kubetok", "/home/ubuntu/.kube/credentials/token", "Kubernetes Token")
+	consumeCmd.Flags().StringVar(&KubeCA, "kubeca", "/var/run/secrets/kubernetes.io/serviceaccount/ca.pem", "Kubernetes CA")
+	consumeCmd.Flags().StringVar(&KubeToken, "kubetok", "/var/run/secrets/kubernetes.io/serviceaccount/token", "Kubernetes Token")
 }

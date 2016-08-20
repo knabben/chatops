@@ -23,8 +23,11 @@ type Consumer struct {
 }
 
 type Event struct {
-	Cmd    string `json:"command"`
-	Params string `json:"params"`
+	Cmd    string   `json:"command"`
+	Args   []string `json:"args"`
+	Image  string   `json:"image"`
+	Params string   `json:"params"`
+	Pod    string   `json:"pod"`
 }
 
 var consumeCmd = &cobra.Command{

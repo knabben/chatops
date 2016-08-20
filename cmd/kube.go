@@ -11,10 +11,6 @@ import (
 var ns = api.NamespaceDefault
 
 func createPod(kubeClient *client.Client, event Event, podName string) {
-	// TODO - Read everything from an YAML
-	var envVars []api.EnvVar = EnvVars()
-	args := []string{event.Cmd, event.Params}
-
 	// Pod specification
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -26,10 +22,9 @@ func createPod(kubeClient *client.Client, event Event, podName string) {
 			RestartPolicy: api.RestartPolicyOnFailure,
 			Containers: []api.Container{
 				{
-					Name:  podName,
-					Image: imgName,
-					Args:  args,
-					Env:   envVars,
+					Name:  event.Pod,
+					Image: event.Image,
+					Args:  event.Args,
 				},
 			},
 		},

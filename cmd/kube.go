@@ -45,9 +45,10 @@ func ReadLogAndPublish(kubeClient *client.Client, consumer Consumer, podName str
 
 	queue, err := channel.QueueDeclare("response", true, false, false, false, nil)
 	for {
-		body, _ := kubeClient.Pods(api.NamespaceDefault).GetLogs(podName, &api.PodLogOptions{}).Do().Raw()
-		// TODO - First log output, check pod state before ending
-		if len(body) > 0 {
+		time.Sleep(3000 * time.Millisecond)
+		result, _ := kubeClient.Pods(ns).Get(podName)
+		if result.Status.Phase == "Succeeded" {
+			body, _ := kubeClient.Pods(ns).GetLogs(podName, &api.PodLogOptions{}).Do().Raw()
 			channel.Publish("", queue.Name, false, false,
 				amqp.Publishing{
 					ContentType: "text/plain",
@@ -56,7 +57,6 @@ func ReadLogAndPublish(kubeClient *client.Client, consumer Consumer, podName str
 			)
 			break
 		}
-		time.Sleep(1000 * time.Millisecond)
 	}
 }
 

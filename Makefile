@@ -12,8 +12,5 @@ hubot-run:
 	--link rabbit:rabbit --name hubot -e \
 	RABBITMQ_URL="amqp://guest:guest@rabbit/" hubot:latest
 
-compile:
-	go run main.go consume
-
 runner:
 	docker build -t runner:latest .

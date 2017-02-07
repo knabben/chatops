@@ -1,0 +1,13 @@
+package: github.com/knabben/chatops/consumer
+import:
+- package: github.com/spf13/cobra
+- package: github.com/spf13/viper
+- package: github.com/streadway/amqp
+- package: gopkg.in/yaml.v2
+- package: k8s.io/client-go
+  version: ^2.0.0-alpha.1
+  subpackages:
+  - kubernetes
+  - pkg/api/v1
+  - rest
+  - tools/clientcmd

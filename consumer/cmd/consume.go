@@ -3,18 +3,20 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"time"
+
+	yaml "gopkg.in/yaml.v2"
+
 	"github.com/spf13/cobra"
 	"github.com/streadway/amqp"
-	"io/ioutil"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"time"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
-var Uri string
-var KubeHost string
-var KubeCA string
-var KubeToken string
+var Uri, Kubeconfig, Varpath string
 
 type Consumer struct {
 	conn    *amqp.Connection
@@ -22,12 +24,19 @@ type Consumer struct {
 	done    chan error
 }
 
+// Event catcher
 type Event struct {
-	Cmd    string   `json:"command"`
-	Args   []string `json:"args"`
-	Image  string   `json:"image"`
-	Params string   `json:"params"`
-	Pod    string   `json:"pod"`
+	Args  []string `json:"args"`
+	Image string   `json:"image"`
+	Pod   string   `json:"pod"`
+	Id    string   `json:"id"`
+}
+
+// Serialized EnvVar struct from Yaml
+type varEnv struct {
+	Name   string
+	Key    string
+	Secret string
 }
 
 var consumeCmd = &cobra.Command{
@@ -41,7 +50,7 @@ var consumeCmd = &cobra.Command{
 }
 
 func initRabbitConn(consumer Consumer) {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(20 * time.Second)
 	quit := make(chan struct{})
 	go func() {
 		for {
@@ -51,11 +60,8 @@ func initRabbitConn(consumer Consumer) {
 				consumer.conn, err = amqp.Dial(Uri)
 				if err != nil {
 					fmt.Println(err)
-					fmt.Println("node will only be able to respond to local connections")
-					fmt.Println("trying to reconnect in 5 seconds...")
 				} else {
 					close(quit)
-
 					// Create a channel and declare a queue to consume from
 					consumer.channel, err = consumer.conn.Channel()
 					queue, err := consumer.channel.QueueDeclare(
@@ -70,6 +76,7 @@ func initRabbitConn(consumer Consumer) {
 					if err != nil {
 						fmt.Println("ERROR: trying to consume runner")
 					}
+					// Gorotine to consumer messages from request queue
 					go handle(deliveries, consumer)
 				}
 			case <-quit:
@@ -94,38 +101,51 @@ func decodeBody(body []byte) (e Event) {
 	err := json.Unmarshal(body, &event)
 	if err != nil {
 		fmt.Println("ERROR: decoding body - %s", err)
+		log.Fatal(err)
 	}
 	return event
 }
 
 func handle(deliveries <-chan amqp.Delivery, consumer Consumer) {
-	var podName string = "script"
-
-	ca, err := ioutil.ReadFile(KubeCA)
+	log.Println("Connecting on Kubernetes")
+	config, err := rest.InClusterConfig()
 	if err != nil {
-		fmt.Println("ERROR: opening the CA file", err)
-	}
-	token, err := ioutil.ReadFile(KubeToken)
-	if err != nil {
-		fmt.Println("ERROR: opening the TOKEN file")
-	}
-
-	config := &restclient.Config{
-		Host:            KubeHost,
-		TLSClientConfig: restclient.TLSClientConfig{CAData: ca},
-		BearerToken:     string(token[:]),
-	}
-	kubeClient, err := client.New(config)
-	if err != nil {
-		fmt.Println("ERROR: Can't connect on Kubernetes server ", err)
+		log.Println(`You're not in a cluster, trying the local configuration,
+					if not possible it should die on next try.`)
+		config, err = clientcmd.BuildConfigFromFlags("", Kubeconfig)
+		if err != nil {
+			panic(err.Error())
+		}
 	}
 
-	// Consume messages and run the pods
+	log.Println("Cool, Kubernetes konnected!")
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	data, err := ioutil.ReadFile(Varpath)
+
+	// All variable env should be stored on a Secret object
+	envList := []varEnv{}
+	err = yaml.Unmarshal(data, &envList)
+	if err != nil {
+		log.Fatal("ERROR trying to parse variables YAML", err)
+	}
+
+	log.Println("Starting listening on broker consumer channel")
 	for msg := range deliveries {
-		body := decodeBody(msg.Body)
-		createPod(kubeClient, body, podName)
-		ReadLogAndPublish(kubeClient, consumer, podName)
-		deletePod(kubeClient, podName)
+		// Consume messages and run the pods
+		go func() {
+			event := decodeBody(msg.Body)
+
+			// StartPod
+			pod := createPod(clientset, event, msg, envList)
+			ReadLogAndPublish(clientset, consumer, pod)
+
+			// Remove pod
+			deletePod(clientset, event.Id)
+		}()
 		msg.Ack(true)
 	}
 	consumer.done <- nil
@@ -133,8 +153,7 @@ func handle(deliveries <-chan amqp.Delivery, consumer Consumer) {
 
 func init() {
 	RootCmd.AddCommand(consumeCmd)
-	consumeCmd.Flags().StringVar(&Uri, "uri", "amqp://guest:guest@localhost:5672", "AQMP default URI")
-	consumeCmd.Flags().StringVar(&KubeHost, "kubehost", "https://kubernetes.default.svc.cluster.local", "Kubernetes host")
-	consumeCmd.Flags().StringVar(&KubeCA, "kubeca", "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt", "Kubernetes CA")
-	consumeCmd.Flags().StringVar(&KubeToken, "kubetok", "/var/run/secrets/kubernetes.io/serviceaccount/token", "Kubernetes Token")
+	consumeCmd.Flags().StringVar(&Uri, "uri", "amqp://guest:guest@rabbitmq:5672", "AQMP default URI")
+	consumeCmd.Flags().StringVar(&Kubeconfig, "kubeconfig", "~/.kube/config", "Kubeconfig path")
+	consumeCmd.Flags().StringVar(&Varpath, "var", "var.yaml", "Variables environment (Secrets) for pods")
 }

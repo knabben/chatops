@@ -153,7 +153,7 @@ func handle(deliveries <-chan amqp.Delivery, consumer Consumer) {
 
 func init() {
 	RootCmd.AddCommand(consumeCmd)
-	consumeCmd.Flags().StringVar(&Uri, "uri", "amqp://guest:guest@rabbitmq:5672", "AQMP default URI")
+	consumeCmd.Flags().StringVar(&Uri, "uri", "amqp://guest:guest@rabbitmq:5672", "AMQP default URI")
 	consumeCmd.Flags().StringVar(&Kubeconfig, "kubeconfig", "~/.kube/config", "Kubeconfig path")
 	consumeCmd.Flags().StringVar(&Varpath, "var", "var.yaml", "Variables environment (Secrets) for pods")
 }

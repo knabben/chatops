@@ -14,4 +14,4 @@ RUN curl https://glide.sh/get | sh
 RUN glide install
 RUN make compile
 
-CMD ["./main", "consume", "--uri", "amqp://guest:guest@rabbitmq:5672"]
+CMD ["commands/run.sh"]

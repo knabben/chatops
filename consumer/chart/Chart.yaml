@@ -1,0 +1,4 @@
+apiVersion: v1
+description: A simple queued Pod runner
+name: consumer
+version: 0.1.0

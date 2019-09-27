@@ -1,0 +1,7 @@
+apiVersion: chat.knabben.net/v1alpha1
+kind: Chat
+metadata:
+  name: example-chat
+spec:
+  # Add fields here
+  size: 3

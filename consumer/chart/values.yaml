@@ -1,9 +1,0 @@
-replicaCount: 1
-namespace: default
-rabbitmqUri: "amqp://guest:guest@rabbitmq.backing/"
-image:
-  repository: knabben/consumer
-  tag: latest
-  pullPolicy: Always
-service:
-  internalPort: 8080

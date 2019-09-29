@@ -5,7 +5,7 @@ ENV OPERATOR=/usr/local/bin/app-operator \
     USER_NAME=app-operator
 
 # install operator binary
-COPY build/_output/bin/app-operator ${OPERATOR}
+COPY build/_output/bin/chatops ${OPERATOR}
 
 COPY build/bin /usr/local/bin
 RUN  /usr/local/bin/user_setup

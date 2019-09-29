@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/knabben/chatops/pkg/chat"
 	"os"
 	"runtime"
 
@@ -107,8 +108,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	inputChan  := make(chan string)
+	outputChan := make(chan string)
+	go chat.ListenChat(inputChan)
+	go chat.ChangeCRD(inputChan, outputChan, mgr.GetClient())
+
 	// Setup all Controllers
-	if err := controller.AddToManager(mgr); err != nil {
+	if err := controller.AddToManager(mgr, outputChan); err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}
@@ -116,6 +122,8 @@ func main() {
 	if err = serveCRMetrics(cfg); err != nil {
 		log.Info("Could not generate and serve custom resource metrics", "error", err.Error())
 	}
+
+
 
 	// Add to the below struct any other metrics ports you want to expose.
 	servicePorts := []v1.ServicePort{

@@ -2,6 +2,7 @@ package chat
 
 import (
 	"context"
+	"fmt"
 
 	chatv1alpha1 "github.com/knabben/chatops/pkg/apis/chat/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -111,7 +112,9 @@ func (r *ReconcileChat) Reconcile(request reconcile.Request) (reconcile.Result, 
 
 	// Check if this Pod already exists
 	found := &corev1.Pod{}
-	r.outputChan <- found.Name
+	r.outputChan <- instance.Spec.Halo
+	fmt.Println("NEW SPEC SAVE", instance)
+
 	err = r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)

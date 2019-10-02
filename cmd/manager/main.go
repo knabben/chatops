@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
+	chatv1alpha1 "github.com/knabben/chatops/pkg/apis/chat/v1alpha1"
 )
 
 // Change below variables to serve metrics on different host or port.
@@ -108,8 +109,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	inputChan  := make(chan string)
-	outputChan := make(chan string)
+	inputChan, outputChan := make(chan *chatv1alpha1.Chat), make(chan string)
+
 	go chat.ListenChat(inputChan)
 	go chat.ChangeCRD(inputChan, outputChan, mgr.GetClient())
 

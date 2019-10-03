@@ -1,0 +1,7 @@
+version: "2"
+domain: chat.ops
+repo: github.com
+resources:
+- group: chat
+  version: v1
+  kind: Chat

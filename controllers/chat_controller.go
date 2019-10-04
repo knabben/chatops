@@ -17,6 +17,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -35,11 +36,15 @@ type ChatReconciler struct {
 // +kubebuilder:rbac:groups=chat.chat.ops,resources=chats/status,verbs=get;update;patch
 
 func (r *ChatReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
-	_ = r.Log.WithValues("chat", req.NamespacedName)
+	ctx := context.Background()
+	log := r.Log.WithValues("chat", req.NamespacedName)
 
-	// your logic here
-
+	chat := &chatv1.Chat{}
+	if err := r.Get(ctx, req.NamespacedName, chat); err != nil {
+		log.Error(err, "unable to list child Jobs")
+		return ctrl.Result{}, err
+	}
+	fmt.Println(chat)
 	return ctrl.Result{}, nil
 }
 

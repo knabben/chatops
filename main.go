@@ -69,7 +69,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Chat")
 		os.Exit(1)
 	}
-	// +kubebuilder:scaffold:builder
+	// +kubebuilder:scaffold:buil   der
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

@@ -12,6 +12,17 @@ import (
 
 var token = os.Getenv("TOKEN")
 
+func UpdateItems(chatList *chatv1.ChatList, chatStatus *chatv1.Chat, client c.Client) {
+	for _, item := range chatList.Items {
+		chatItem := item.DeepCopy()
+		chatItem.Spec.Timestamp = time.Now().Unix()
+		if err := client.Update(context.Background(), chatItem); err != nil {
+			fmt.Println("UpdateERROR", err)
+			continue
+		}
+	}
+}
+
 func ChangeCRD(inputChannel chan *chatv1.Chat, outputChannel chan string, client c.Client) {
 	api := slack.New(token)
 
@@ -21,28 +32,15 @@ func ChangeCRD(inputChannel chan *chatv1.Chat, outputChannel chan string, client
 		case "chat":
 			var chatList = &chatv1.ChatList{}
 			if err := client.List(context.Background(), chatList, &c.ListOptions{}); err != nil {
-				fmt.Println(err)
+				fmt.Println("List error", err)
+				continue
 			}
 
-			for _, item := range chatList.Items {
-				chatItem := item.DeepCopy()
-				chatItem.Status = chat.Status
+			UpdateItems(chatList, chat, client)
 
-				err := client.Status().Update(context.Background(), chatItem)
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
-
-				chatItem.Spec.Timestamp = time.Now().Unix()
-				err = client.Update(context.Background(), chatItem)
-				if err != nil {
-					fmt.Println(err)
-					continue
-				}
-			}
-			_, _, err := api.PostMessage("CKY72UCH1", slack.MsgOptionText("ok", false))
-			if err != nil {
+			data := <-outputChannel
+			fmt.Println(data)
+			if _, _, err := api.PostMessage("CKY72UCH1", slack.MsgOptionText(data, false)); err != nil {
 				fmt.Println(err)
 			}
 			fmt.Println("-------")

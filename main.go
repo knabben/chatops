@@ -45,6 +45,8 @@ func init() {
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
+	inputChan, outputChan := make(chan *chatv1.Chat), make(chan string)
+
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
@@ -52,7 +54,8 @@ func main() {
 
 	ctrl.SetLogger(zap.Logger(true))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	config := ctrl.GetConfigOrDie()
+	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
 		LeaderElection:     enableLeaderElection,
@@ -66,13 +69,13 @@ func main() {
 	if err = (&controllers.ChatReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("Chat"),
+		Config: config,
+		Output: outputChan,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Chat")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
-
-	inputChan, outputChan := make(chan *chatv1.Chat), make(chan string)
 
 	go chat.ListenChat(inputChan)
 	go chat.ChangeCRD(inputChan, outputChan, mgr.GetClient())

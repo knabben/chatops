@@ -16,29 +16,72 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"context"
-
+	"fmt"
 	"github.com/go-logr/logr"
+	chatv1 "github.com/knabben/chatops/api/v1"
+	"io"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	chatv1 "github.com/knabben/chatops/api/v1"
 )
+
+var clientset *kubernetes.Clientset
 
 // ChatReconciler reconciles a Chat object
 type ChatReconciler struct {
 	client.Client
-	Log logr.Logger
+	Log    logr.Logger
+	Config *rest.Config
+	Output chan string
 }
 
 // +kubebuilder:rbac:groups=chat.ops.com,resources=chats,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=chat.ops.com,resources=chats/status,verbs=get;update;patch
 
 func (r *ChatReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
-	_ = r.Log.WithValues("chat", req.NamespacedName)
+	ctx := context.Background()
+	log := r.Log.WithValues("chat", req.NamespacedName)
 
-	// your logic here
+	log.Info("Starting reconcile.")
+
+	var childPods corev1.PodList
+	if err := r.List(ctx, &childPods, &client.ListOptions{Namespace: "default"}); err != nil {
+		log.Error(err, "unable to list child Jobs")
+		return ctrl.Result{}, err
+	}
+
+	clientset, err := kubernetes.NewForConfig(r.Config)
+	if err != nil {
+		fmt.Println(err)
+		return ctrl.Result{}, err
+	}
+
+	for _, pod := range childPods.Items {
+		podLogOpts := corev1.PodLogOptions{}
+
+		req := clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &podLogOpts)
+		podLogs, err := req.Stream()
+		if err != nil {
+			fmt.Println(err)
+			return ctrl.Result{}, err
+		}
+		defer podLogs.Close()
+
+		// Copy buf
+		buf := new(bytes.Buffer)
+		_, err = io.Copy(buf, podLogs)
+		if err != nil {
+			fmt.Println(err)
+			return ctrl.Result{}, err
+		}
+		data := buf.String()
+		fmt.Println(data)
+		r.Output <- data
+	}
 
 	return ctrl.Result{}, nil
 }

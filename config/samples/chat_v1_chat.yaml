@@ -3,5 +3,6 @@ kind: Chat
 metadata:
   name: chat-sample
 spec:
-  # Add fields here
-  foo: bar
+  command: ls
+  name: pod-exec
+  timestamp: 1234

@@ -17,10 +17,11 @@ package main
 
 import (
 	"flag"
+	"github.com/knabben/chatops/pkg"
 	"os"
 
-	chatv1 "github.com/api/v1"
-	"github.com/controllers"
+	chatv1 "github.com/knabben/chatops/api/v1"
+	"github.com/knabben/chatops/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -69,7 +70,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Chat")
 		os.Exit(1)
 	}
-	// +kubebuilder:scaffold:buil   der
+	// +kubebuilder:scaffold:builder
+
+	inputChan, outputChan := make(chan *chatv1.Chat), make(chan string)
+
+	go chat.ListenChat(inputChan)
+	go chat.ChangeCRD(inputChan, outputChan, mgr.GetClient())
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

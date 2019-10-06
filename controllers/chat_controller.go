@@ -17,13 +17,12 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	chatv1 "github.com/api/v1"
+	chatv1 "github.com/knabben/chatops/api/v1"
 )
 
 // ChatReconciler reconciles a Chat object
@@ -32,19 +31,15 @@ type ChatReconciler struct {
 	Log logr.Logger
 }
 
-// +kubebuilder:rbac:groups=chat.chat.ops,resources=chats,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=chat.chat.ops,resources=chats/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=chat.ops.com,resources=chats,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=chat.ops.com,resources=chats/status,verbs=get;update;patch
 
 func (r *ChatReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
-	log := r.Log.WithValues("chat", req.NamespacedName)
+	_ = context.Background()
+	_ = r.Log.WithValues("chat", req.NamespacedName)
 
-	chat := &chatv1.Chat{}
-	if err := r.Get(ctx, req.NamespacedName, chat); err != nil {
-		log.Error(err, "unable to list child Jobs")
-		return ctrl.Result{}, err
-	}
-	fmt.Println(chat)
+	// your logic here
+
 	return ctrl.Result{}, nil
 }
 

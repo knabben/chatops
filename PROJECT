@@ -1,6 +1,6 @@
 version: "2"
-domain: chat.ops
-repo: github.com
+domain: ops.com
+repo: github.com/knabben/chatops
 resources:
 - group: chat
   version: v1

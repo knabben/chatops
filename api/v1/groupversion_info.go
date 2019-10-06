@@ -15,7 +15,7 @@ limitations under the License.
 
 // Package v1 contains API Schema definitions for the chat v1 API group
 // +kubebuilder:object:generate=true
-// +groupName=chat.chat.ops
+// +groupName=chat.ops.com
 package v1
 
 import (
@@ -25,7 +25,7 @@ import (
 
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "chat.chat.ops", Version: "v1"}
+	GroupVersion = schema.GroupVersion{Group: "chat.ops.com", Version: "v1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}

@@ -1,4 +1,4 @@
-apiVersion: chat.chat.ops/v1
+apiVersion: chat.ops.com/v1
 kind: Chat
 metadata:
   name: chat-sample

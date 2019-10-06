@@ -7,7 +7,7 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - chat.chat.ops
+  - chat.ops.com
   resources:
   - chats
   verbs:
@@ -19,7 +19,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - chat.chat.ops
+  - chat.ops.com
   resources:
   - chats/status
   verbs:

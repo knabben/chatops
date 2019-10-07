@@ -17,11 +17,13 @@ package main
 
 import (
 	"flag"
-	"github.com/knabben/chatops/pkg"
+	"fmt"
+	"github.com/knabben/chatops/pkg/chat"
 	"os"
 
 	chatv1 "github.com/knabben/chatops/api/v1"
 	"github.com/knabben/chatops/controllers"
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -40,6 +42,11 @@ func init() {
 
 	_ = chatv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
+
+	viper.SetEnvPrefix("ctrl")
+	viper.BindEnv("slack_token")
+
+	fmt.Println(viper.Get("slack_token"))
 }
 
 func main() {
@@ -77,8 +84,9 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	go chat.ListenChat(inputChan)
-	go chat.ChangeCRD(inputChan, outputChan, mgr.GetClient())
+	chatClient := chat.NewChat(viper.GetString("slack_token"))
+	go chatClient.ListenChat(inputChan)
+	go chatClient.ChangeCRD(inputChan, outputChan, mgr.GetClient())
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

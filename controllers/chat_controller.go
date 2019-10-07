@@ -21,15 +21,21 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	chatv1 "github.com/knabben/chatops/api/v1"
+	"github.com/knabben/chatops/pkg/chat"
+	"github.com/spf13/viper"
 	"io"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sync"
 )
 
-var clientset *kubernetes.Clientset
+var (
+	clientset *kubernetes.Clientset
+	lock      sync.Mutex
+)
 
 // ChatReconciler reconciles a Chat object
 type ChatReconciler struct {
@@ -45,9 +51,9 @@ type ChatReconciler struct {
 func (r *ChatReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	log := r.Log.WithValues("chat", req.NamespacedName)
-
 	log.Info("Starting reconcile.")
 
+	// List Pods
 	var childPods corev1.PodList
 	if err := r.List(ctx, &childPods, &client.ListOptions{Namespace: "default"}); err != nil {
 		log.Error(err, "unable to list child Jobs")
@@ -78,9 +84,9 @@ func (r *ChatReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			fmt.Println(err)
 			return ctrl.Result{}, err
 		}
-		data := buf.String()
-		fmt.Println(data)
-		r.Output <- data
+
+		chatClient := chat.NewChat(viper.GetString("slack_token"))
+		chatClient.SendMessage(buf.String())
 	}
 
 	return ctrl.Result{}, nil

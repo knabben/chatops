@@ -24,17 +24,18 @@ import (
 
 // ChatSpec defines the desired state of Chat
 type ChatSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	Command   string `json:"command"`
-	Name      string `json:"name"`
+	PodLabel  string `json:"podlabel"`
+	Username  string `json:"username"`
 	Timestamp int64  `json:"timestamp"`
 }
 
 // ChatStatus defines the observed state of Chat
 type ChatStatus struct {
-	Username string `json:"username"`
-	Command  string `json:"command"`
+	Command   string `json:"command"`
+	Arguments string `json:"arguments"`
+	Username  string `json:"username"`
+	Timestmap string `json:"timestamp"`
+	Channel   string `json:"channel"`
 }
 
 // +kubebuilder:object:root=true

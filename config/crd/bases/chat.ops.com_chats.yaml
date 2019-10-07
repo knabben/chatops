@@ -32,29 +32,36 @@ spec:
         spec:
           description: ChatSpec defines the desired state of Chat
           properties:
-            command:
-              description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-                Important: Run "make" to regenerate code after modifying this file'
-              type: string
-            name:
+            podlabel:
               type: string
             timestamp:
               format: int64
               type: integer
+            username:
+              type: string
           required:
-          - command
-          - name
+          - podlabel
           - timestamp
+          - username
           type: object
         status:
           description: ChatStatus defines the observed state of Chat
           properties:
+            arguments:
+              type: string
+            channel:
+              type: string
             command:
+              type: string
+            timestamp:
               type: string
             username:
               type: string
           required:
+          - arguments
+          - channel
           - command
+          - timestamp
           - username
           type: object
       type: object

@@ -32,17 +32,17 @@ spec:
         spec:
           description: ChatSpec defines the desired state of Chat
           properties:
+            command:
+              type: string
             podlabel:
               type: string
             timestamp:
               format: int64
               type: integer
-            username:
-              type: string
           required:
+          - command
           - podlabel
           - timestamp
-          - username
           type: object
         status:
           description: ChatStatus defines the observed state of Chat

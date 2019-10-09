@@ -25,7 +25,7 @@ import (
 // ChatSpec defines the desired state of Chat
 type ChatSpec struct {
 	PodLabel  string `json:"podlabel"`
-	Username  string `json:"username"`
+	Command   string `json:"command"`
 	Timestamp int64  `json:"timestamp"`
 }
 
@@ -34,7 +34,7 @@ type ChatStatus struct {
 	Command   string `json:"command"`
 	Arguments string `json:"arguments"`
 	Username  string `json:"username"`
-	Timestmap string `json:"timestamp"`
+	Timestamp string `json:"timestamp"`
 	Channel   string `json:"channel"`
 }
 

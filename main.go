@@ -43,17 +43,31 @@ func init() {
 	_ = chatv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 
+	SetConfiguration()
+}
+
+// SetConfiguration parses YAML configuration file and render variables
+func SetConfiguration() {
 	viper.SetEnvPrefix("ctrl")
 	viper.BindEnv("slack_token")
 
-	fmt.Println(viper.Get("slack_token"))
+	viper.SetConfigName("env")
+	viper.AddConfigPath(".")
+
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Println(err)
+		setupLog.Error(err, "No configuration file was found.")
+		os.Exit(1)
+	}
 }
 
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
-	inputChan, outputChan := make(chan *chatv1.Chat), make(chan string)
 
+	inputChan := make(chan *chatv1.ChatStatus)
+
+	// TODO - Bring to viper
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
@@ -77,16 +91,17 @@ func main() {
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("Chat"),
 		Config: config,
-		Output: outputChan,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Chat")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 
-	chatClient := chat.NewChat(viper.GetString("slack_token"))
+	// Start slack communication goroutine
+	token := viper.GetString("slack_token")
+	chatClient := chat.NewChat(token, mgr.GetClient())
 	go chatClient.ListenChat(inputChan)
-	go chatClient.ChangeCRD(inputChan, outputChan, mgr.GetClient())
+	go chatClient.ChangeCRD(inputChan)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

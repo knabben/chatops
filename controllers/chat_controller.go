@@ -21,9 +21,8 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	chatv1 "github.com/knabben/chatops/api/v1"
-	"github.com/knabben/chatops/pkg/chat"
-	"github.com/spf13/viper"
 	"io"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -42,7 +41,6 @@ type ChatReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Config *rest.Config
-	Output chan string
 }
 
 // +kubebuilder:rbac:groups=chat.ops.com,resources=chats,verbs=get;list;watch;create;update;patch;delete
@@ -85,8 +83,8 @@ func (r *ChatReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			return ctrl.Result{}, err
 		}
 
-		chatClient := chat.NewChat(viper.GetString("slack_token"))
-		chatClient.SendMessage(buf.String())
+		//chatClient := chat.NewChat(viper.GetString("slack_token"))
+		//chatClient.SendMessage(buf.String())
 	}
 
 	return ctrl.Result{}, nil

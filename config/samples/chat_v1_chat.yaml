@@ -3,6 +3,12 @@ kind: Chat
 metadata:
   name: chat-sample
 spec:
-  command: ls
-  name: pod-exec
-  timestamp: 1234
+  command: report
+  podlabel: server1
+  timestamp: 0
+status:
+  arguments: ""
+  channel: CKY72UCH1
+  command: report
+  timestamp: ""
+  username: ""

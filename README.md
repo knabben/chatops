@@ -1,9 +1,10 @@
 # Cloud Native Chatbot
 
-Enables the operator to setup a Slack bot that receives commands
-execute it on specific containers and return to who requested the 
-ouput value.
+Enables the operator to setup a Slack bot that receives commands,
+execute it on a specific container, and return the output value to who 
+requested it.
 
+**NOTE: DON'T USE THIS IN PRODUCTION** 
 
 ### Installation
 
@@ -77,6 +78,7 @@ make run
 
 ## Production
 
-This is a POC - **NOTE: DON'T USE THIS IN PRODUCTION** 
-
-Enabling CRDs mgmt and pod/exec is really not a good RBAC permission for a regular user since you can't create granularity for what can be executed from the CRD creation.
+Enabling CRDs mgmt and pod/exec is really not a good RBAC permission 
+for a regular user since you can't create granularity for what can be 
+executed from the CRD creation, even if you ACL things in this app
+other people using the account can ignore it.

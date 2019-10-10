@@ -90,7 +90,7 @@ func (c *Chat) ExtractChatStatus(message *slack.MessageEvent) *chatv1.ChatStatus
 	tokens := strings.Split(message.Text, " ")
 	arguments := strings.Join(tokens[1:], " ")
 
-	if len(tokens) < 1 || len(arguments) == 0  {
+	if len(tokens) < 1 || len(arguments) == 0 {
 		return nil
 	}
 

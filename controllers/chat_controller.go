@@ -16,12 +16,22 @@ limitations under the License.
 package controllers
 
 import (
-	"bytes"
+	//"bytes"
+	//"github.com/knabben/chatops/pkg/chat"
+	//"io"
+	//"net/url"
+	//"strings"
+
+	//"bytes"
 	"context"
 	"fmt"
 	"github.com/go-logr/logr"
 	chatv1 "github.com/knabben/chatops/api/v1"
-	"io"
+	"github.com/knabben/chatops/pkg/chat"
+	"github.com/knabben/chatops/pkg/command"
+
+	//"github.com/knabben/chatops/pkg/chat"
+	//"io"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -29,12 +39,16 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sync"
+
+	"github.com/spf13/viper"
 )
 
 var (
 	clientset *kubernetes.Clientset
 	lock      sync.Mutex
 )
+
+
 
 // ChatReconciler reconciles a Chat object
 type ChatReconciler struct {
@@ -51,44 +65,50 @@ func (r *ChatReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("chat", req.NamespacedName)
 	log.Info("Starting reconcile.")
 
-	// List Pods
-	var childPods corev1.PodList
-	if err := r.List(ctx, &childPods, &client.ListOptions{Namespace: "default"}); err != nil {
-		log.Error(err, "unable to list child Jobs")
-		return ctrl.Result{}, err
-	}
-
 	clientset, err := kubernetes.NewForConfig(r.Config)
 	if err != nil {
 		fmt.Println(err)
 		return ctrl.Result{}, err
 	}
 
-	for _, pod := range childPods.Items {
-		podLogOpts := corev1.PodLogOptions{}
-
-		req := clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &podLogOpts)
-		podLogs, err := req.Stream()
-		if err != nil {
-			fmt.Println(err)
-			return ctrl.Result{}, err
-		}
-		defer podLogs.Close()
-
-		// Copy buf
-		buf := new(bytes.Buffer)
-		_, err = io.Copy(buf, podLogs)
-		if err != nil {
-			fmt.Println(err)
-			return ctrl.Result{}, err
-		}
-
-		//chatClient := chat.NewChat(viper.GetString("slack_token"))
-		//chatClient.SendMessage(buf.String())
+	var chatType chatv1.Chat
+	if err := r.Get(ctx, req.NamespacedName, &chatType); err != nil {
+		log.Error(err, "unable to fetch chat type.")
+		return ctrl.Result{}, nil
 	}
+
+	pod := r.FindPod(ctx, chatType.Spec.PodLabel, req)
+	if pod == nil {
+		log.Error(err, "unable to find pod.")
+		return ctrl.Result{}, nil
+	}
+
+	podExec := command.NewPodExec(r.Config, *clientset, req.Namespace)
+	stdout, _, err := podExec.ExecCommandInContainer(pod.ObjectMeta.Name, chatType.Status.Command, chatType.Status.Arguments)
+
+	chatClient := chat.NewChat(viper.GetString("slack_token"), r.Client)
+	chatClient.SendMessage(stdout)
 
 	return ctrl.Result{}, nil
 }
+
+// FindPod search for a pod by label - how to use the lib for this
+func (r *ChatReconciler) FindPod(ctx context.Context, label string, req ctrl.Request) *corev1.Pod {
+	var childPods corev1.PodList
+	if err := r.List(ctx, &childPods, client.InNamespace(req.Namespace)); err != nil {
+		r.Log.Error(err, "unable to list child Jobs")
+		//return ctrl.Result{}, err
+	}
+	for _, pod := range childPods.Items {
+		for _, podLabel := range pod.ObjectMeta.Labels {
+			if podLabel == label {
+				return &pod
+			}
+		}
+	}
+	return nil
+}
+
 
 func (r *ChatReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).

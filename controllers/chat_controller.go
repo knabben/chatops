@@ -48,8 +48,6 @@ var (
 	lock      sync.Mutex
 )
 
-
-
 // ChatReconciler reconciles a Chat object
 type ChatReconciler struct {
 	client.Client
@@ -108,7 +106,6 @@ func (r *ChatReconciler) FindPod(ctx context.Context, label string, req ctrl.Req
 	}
 	return nil
 }
-
 
 func (r *ChatReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).

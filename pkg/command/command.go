@@ -6,9 +6,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/client-go/kubernetes/scheme"
 	"net/url"
 	"strings"
 )
@@ -27,14 +27,14 @@ type ExecOptions struct {
 type PodExec struct {
 	ClientSet clientset.Clientset
 	Namespace string
-	Config *restclient.Config
+	Config    *restclient.Config
 }
 
 func NewPodExec(config *restclient.Config, clientset kubernetes.Clientset, namespace string) *PodExec {
 	return &PodExec{
 		ClientSet: clientset,
 		Namespace: namespace,
-		Config: config,
+		Config:    config,
 	}
 }
 

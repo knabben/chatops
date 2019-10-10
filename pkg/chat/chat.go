@@ -64,7 +64,8 @@ func (c *Chat) ListenChat(inputChannel chan *chatv1.ChatStatus) {
 
 		case *slack.MessageEvent:
 			chatStatus := c.ExtractChatStatus(ev)
-			if ev.User != "" || chatStatus != nil { // filter commands here before listing on CRD?
+			if ev.Username != "td" && chatStatus != nil { // filter commands here before listing on CRD?
+				fmt.Println(fmt.Sprintf("Message: %v, %s\n", ev.Text, ev.User))
 				inputChannel <- chatStatus
 			}
 
@@ -78,7 +79,7 @@ func (c *Chat) ListenChat(inputChannel chan *chatv1.ChatStatus) {
 func (c *Chat) ChangeCRD(inputChannel chan *chatv1.ChatStatus) {
 	for {
 		chatStatus := <-inputChannel
-		if chat, err := c.commandInCRD(chatStatus.Command); err == nil {
+		if chat, _ := c.commandInCRD(chatStatus.Command); chat != nil {
 			c.UpdateItem(chat, *chatStatus)
 		}
 	}
@@ -86,16 +87,16 @@ func (c *Chat) ChangeCRD(inputChannel chan *chatv1.ChatStatus) {
 
 // ExtractChatStatus returns a translated content of chat status
 func (c *Chat) ExtractChatStatus(message *slack.MessageEvent) *chatv1.ChatStatus {
-	fmt.Println(fmt.Sprintf("Message: %v, %s\n", message.Text, message.User))
-
 	tokens := strings.Split(message.Text, " ")
-	if len(tokens) == 1 {
+	arguments := strings.Join(tokens[1:], " ")
+
+	if len(tokens) < 1 || len(arguments) == 0  {
 		return nil
 	}
 
 	return &chatv1.ChatStatus{
 		Command:   tokens[0],
-		Arguments: strings.Join(tokens[1:], " "),
+		Arguments: arguments,
 		Username:  message.Username,
 		Timestamp: time.Now().String(),
 		Channel:   message.Channel,

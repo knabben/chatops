@@ -55,7 +55,17 @@ status:
 The main fields here are:
 - Spec.Command - The binary on PATH
 - Spec.Podlabel - Used for search the Pod 
- 
+
+## Development
+
+### Configure Slack
+
+Create a new file ./env.yaml with your Slack token:
+
+```
+CTRL_SLACK_TOKEN: xoxb-random-689172615444-hhhhNhhTO5hhhhItyyy4yyf9
+```
+
 ### Running locally
 
 To run the controller locally, after settings up the commands:
@@ -64,3 +74,9 @@ To run the controller locally, after settings up the commands:
 export GO111MODULE=on
 make run
 ```
+
+## Production
+
+This is a POC - **NOTE: DON'T USE THIS IN PRODUCTION** 
+
+Enabling CRDs mgmt and pod/exec is really not a good RBAC permission for a regular user since you can't create granularity for what can be executed from the CRD creation.

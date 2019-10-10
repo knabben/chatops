@@ -3,6 +3,7 @@ module github.com/knabben/chatops
 go 1.12
 
 require (
+	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
 	github.com/go-logr/logr v0.1.0
 	github.com/nlopes/slack v0.6.0
 	github.com/onsi/ginkgo v1.6.0

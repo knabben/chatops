@@ -22,13 +22,18 @@ import (
 	//"net/url"
 	//"strings"
 
+	kbatch "k8s.io/api/batch/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	//"bytes"
 	"context"
 	"fmt"
+	"time"
+
+	//"fmt"
 	"github.com/go-logr/logr"
 	chatv1 "github.com/knabben/chatops/api/v1"
-	"github.com/knabben/chatops/pkg/chat"
-	"github.com/knabben/chatops/pkg/command"
+	//"github.com/knabben/chatops/pkg/chat"
 
 	//"github.com/knabben/chatops/pkg/chat"
 	//"io"
@@ -39,8 +44,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sync"
-
-	"github.com/spf13/viper"
+	//"github.com/spf13/viper"
 )
 
 var (
@@ -63,48 +67,45 @@ func (r *ChatReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("chat", req.NamespacedName)
 	log.Info("Starting reconcile.")
 
-	clientset, err := kubernetes.NewForConfig(r.Config)
-	if err != nil {
-		fmt.Println(err)
-		return ctrl.Result{}, err
-	}
-
-	var chatType chatv1.Chat
-	if err := r.Get(ctx, req.NamespacedName, &chatType); err != nil {
+	var chat chatv1.Chat
+	if err := r.Get(ctx, req.NamespacedName, &chat); err != nil {
 		log.Error(err, "unable to fetch chat type.")
 		return ctrl.Result{}, nil
 	}
 
-	pod := r.FindPod(ctx, chatType.Spec.PodLabel, req)
-	if pod == nil {
-		log.Error(err, "unable to find pod.")
-		return ctrl.Result{}, nil
+	name := fmt.Sprintf("%s-%d", chat.Name, time.Now().Unix())
+	job := &kbatch.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:      make(map[string]string),
+			Annotations: make(map[string]string),
+			Name:        name,
+			Namespace:   chat.Namespace,
+		},
+		Spec: kbatch.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy:  corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						{
+							Image:   chat.Spec.JobImage,
+							Command: []string{chat.Spec.Command},
+							Name:    name,
+
+						},
+					},
+				},
+			},
+		},
 	}
 
-	podExec := command.NewPodExec(r.Config, *clientset, req.Namespace)
-	stdout, _, err := podExec.ExecCommandInContainer(pod.ObjectMeta.Name, chatType.Status.Command, chatType.Status.Arguments)
+	// ...and create it on the cluster
+	if err := r.Create(ctx, job); err != nil {
+		log.Error(err, "unable to create Job", "job", job)
+		return ctrl.Result{}, err
+	}
 
-	chatClient := chat.NewChat(viper.GetString("slack_token"), r.Client)
-	chatClient.SendMessage(stdout)
-
+	log.V(1).Info("created Job for CronJob run", "job", job)
 	return ctrl.Result{}, nil
-}
-
-// FindPod search for a pod by label - how to use the lib for this
-func (r *ChatReconciler) FindPod(ctx context.Context, label string, req ctrl.Request) *corev1.Pod {
-	var childPods corev1.PodList
-	if err := r.List(ctx, &childPods, client.InNamespace(req.Namespace)); err != nil {
-		r.Log.Error(err, "unable to list child Jobs")
-		//return ctrl.Result{}, err
-	}
-	for _, pod := range childPods.Items {
-		for _, podLabel := range pod.ObjectMeta.Labels {
-			if podLabel == label {
-				return &pod
-			}
-		}
-	}
-	return nil
 }
 
 func (r *ChatReconciler) SetupWithManager(mgr ctrl.Manager) error {

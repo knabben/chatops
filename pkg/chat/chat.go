@@ -6,8 +6,9 @@ import (
 	"github.com/go-logr/logr"
 	chatv1 "github.com/knabben/chatops/api/v1"
 	"github.com/nlopes/slack"
+	"k8s.io/apimachinery/pkg/types"
 	cl "sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
+	//"strings"
 	"time"
 )
 
@@ -38,20 +39,28 @@ func (c *Chat) UpdateItem(chat *chatv1.Chat, status chatv1.ChatStatus) {
 	}
 }
 
-func (c *Chat) commandInCRD(command string) (*chatv1.Chat, error) {
-	var chatList = &chatv1.ChatList{}
-	if err := c.List(context.Background(), chatList, &cl.ListOptions{}); err != nil {
-		fmt.Println("List ERROR", err)
-		return nil, err
+func (c *Chat) commandInCRD(command string) *chatv1.Chat {
+	var chat chatv1.Chat
+	objectKey := types.NamespacedName{
+		Namespace: "default",
+		Name:      "chat-sample",
 	}
 
-	for _, item := range chatList.Items {
-		if item.Spec.Command == command {
-			return &item, nil
+	err := c.Get(context.Background(), objectKey, &chat)
+	if err != nil {
+		return nil
+	}
+	return &chat
+}
+
+// ChangeCRD updates the resource definition based on Slack events
+func (c *Chat) ChangeCRD(inputChannel chan *chatv1.ChatStatus) {
+	for {
+		chatStatus := <-inputChannel
+		if chat := c.commandInCRD(chatStatus.Command); chat != nil {
+			c.UpdateItem(chat, *chatStatus)
 		}
 	}
-
-	return nil, nil
 }
 
 // ListenChat listen for events in the chat channel
@@ -63,9 +72,9 @@ func (c *Chat) ListenChat(inputChannel chan *chatv1.ChatStatus) {
 		switch ev := msg.Data.(type) {
 
 		case *slack.MessageEvent:
-			chatStatus := c.ExtractChatStatus(ev)
-			if ev.Username != "td" && chatStatus != nil { // filter commands here before listing on CRD?
+			if c.FilterValidMessage(ev) {
 				fmt.Println(fmt.Sprintf("Message: %v, %s\n", ev.Text, ev.User))
+				chatStatus := c.ExtractChatStatus(ev)
 				inputChannel <- chatStatus
 			}
 
@@ -75,29 +84,16 @@ func (c *Chat) ListenChat(inputChannel chan *chatv1.ChatStatus) {
 	}
 }
 
-// ChangeCRD updates the resource definition based on Slack events
-func (c *Chat) ChangeCRD(inputChannel chan *chatv1.ChatStatus) {
-	for {
-		chatStatus := <-inputChannel
-		if chat, _ := c.commandInCRD(chatStatus.Command); chat != nil {
-			c.UpdateItem(chat, *chatStatus)
-		}
-	}
+// FilterValidMessage filters ConfigMaps to match possible regex and ACL
+func (c *Chat) FilterValidMessage(message *slack.MessageEvent) bool {
+	return true
 }
 
 // ExtractChatStatus returns a translated content of chat status
 func (c *Chat) ExtractChatStatus(message *slack.MessageEvent) *chatv1.ChatStatus {
-	tokens := strings.Split(message.Text, " ")
-	arguments := strings.Join(tokens[1:], " ")
-
-	if len(tokens) < 1 || len(arguments) == 0 {
-		return nil
-	}
-
 	return &chatv1.ChatStatus{
-		Command:   tokens[0],
-		Arguments: arguments,
-		Username:  message.Username,
+		Command:   message.Text,
+		Username:  message.User,
 		Timestamp: time.Now().String(),
 		Channel:   message.Channel,
 	}

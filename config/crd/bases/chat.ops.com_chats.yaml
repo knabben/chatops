@@ -34,21 +34,19 @@ spec:
           properties:
             command:
               type: string
-            podlabel:
+            jobImage:
               type: string
             timestamp:
               format: int64
               type: integer
           required:
           - command
-          - podlabel
+          - jobImage
           - timestamp
           type: object
         status:
           description: ChatStatus defines the observed state of Chat
           properties:
-            arguments:
-              type: string
             channel:
               type: string
             command:
@@ -58,7 +56,6 @@ spec:
             username:
               type: string
           required:
-          - arguments
           - channel
           - command
           - timestamp

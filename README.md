@@ -56,7 +56,7 @@ The main fields here are:
 
 - Spec.command - The binary path used in the job
 - Spec.jobImage - The image URL used in the job
-- Spec.userACL - A list of Slack users who are  
+- Spec.userACL - A list of Slack users who are
 
 ## Development
 

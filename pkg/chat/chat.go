@@ -77,7 +77,6 @@ func (c *Chat) ListenChat(inputChannel chan *chatv1.ChatStatus) {
 				chatStatus := c.ExtractChatStatus(ev)
 				inputChannel <- chatStatus
 			}
-
 		case *slack.RTMError:
 			fmt.Printf("Error: %s\n", ev.Error())
 		}

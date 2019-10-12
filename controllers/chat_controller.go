@@ -88,7 +88,7 @@ func (r *ChatReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	logs := r.PodLog(clientset, pod)
 	chatClient.SendMessage(logs)
-	log.V(1).Info("created Job for CronJob run", "job", pod)
+	log.V(1).Info("created pod run:", pod)
 
 	return ctrl.Result{}, nil
 }

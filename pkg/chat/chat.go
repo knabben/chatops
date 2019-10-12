@@ -86,7 +86,7 @@ func (c *Chat) ListenChat(inputChannel chan *chatv1.ChatStatus) {
 
 // FilterValidMessage filters ConfigMaps to match possible regex and ACL
 func (c *Chat) FilterValidMessage(message *slack.MessageEvent) bool {
-	return true
+	return message.SubType != "bot_message"
 }
 
 // ExtractChatStatus returns a translated content of chat status

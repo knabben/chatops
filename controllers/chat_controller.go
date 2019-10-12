@@ -16,35 +16,30 @@ limitations under the License.
 package controllers
 
 import (
-	//"bytes"
 	//"github.com/knabben/chatops/pkg/chat"
-	//"io"
-	//"net/url"
-	//"strings"
+	//"github.com/spf13/viper"
 
-	kbatch "k8s.io/api/batch/v1"
+	"bytes"
+	"github.com/knabben/chatops/pkg/chat"
+	"io"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	//"bytes"
 	"context"
 	"fmt"
 	"time"
 
-	//"fmt"
 	"github.com/go-logr/logr"
 	chatv1 "github.com/knabben/chatops/api/v1"
-	//"github.com/knabben/chatops/pkg/chat"
+	"k8s.io/client-go/kubernetes"
 
-	//"github.com/knabben/chatops/pkg/chat"
-	//"io"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sync"
-	//"github.com/spf13/viper"
+	"github.com/spf13/viper"
+
 )
 
 var (
@@ -67,45 +62,78 @@ func (r *ChatReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("chat", req.NamespacedName)
 	log.Info("Starting reconcile.")
 
-	var chat chatv1.Chat
-	if err := r.Get(ctx, req.NamespacedName, &chat); err != nil {
+	chatClient := chat.NewChat(viper.GetString("slack_token"), r.Client)
+
+	var chatType chatv1.Chat
+	if err := r.Get(ctx, req.NamespacedName, &chatType); err != nil {
 		log.Error(err, "unable to fetch chat type.")
 		return ctrl.Result{}, nil
 	}
 
-	name := fmt.Sprintf("%s-%d", chat.Name, time.Now().Unix())
-	job := &kbatch.Job{
+	clientset, err := kubernetes.NewForConfig(r.Config)
+	if err != nil {
+		fmt.Println(err)
+		return ctrl.Result{}, err
+	}
+
+	pod := r.GeneratePOD(&chatType)
+
+	// ...and create it on the cluster
+	if err := r.Create(ctx, pod); err != nil {
+		log.Error(err, "unable to create pod", "job", pod)
+		return ctrl.Result{}, err
+	}
+	// TODO - Listen for pod events
+	time.Sleep(5 * time.Second)
+
+	logs := r.PodLog(clientset, pod)
+	chatClient.SendMessage(logs)
+	log.V(1).Info("created Job for CronJob run", "job", pod)
+
+	return ctrl.Result{}, nil
+}
+
+func (r *ChatReconciler) GeneratePOD(chatType *chatv1.Chat) *corev1.Pod {
+	name := fmt.Sprintf("%s-%d", chatType.Name, time.Now().Unix())
+	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      make(map[string]string),
 			Annotations: make(map[string]string),
 			Name:        name,
-			Namespace:   chat.Namespace,
+			Namespace:   chatType.Namespace,
 		},
-		Spec: kbatch.JobSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					RestartPolicy:  corev1.RestartPolicyNever,
-					Containers: []corev1.Container{
-						{
-							Image:   chat.Spec.JobImage,
-							Command: []string{chat.Spec.Command},
-							Name:    name,
-
-						},
-					},
+		Spec: corev1.PodSpec{
+			RestartPolicy:  corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				{
+					Name:    name,
+					Image:   chatType.Spec.JobImage,
+					Command: []string{chatType.Spec.Command},
 				},
 			},
 		},
 	}
+}
 
-	// ...and create it on the cluster
-	if err := r.Create(ctx, job); err != nil {
-		log.Error(err, "unable to create Job", "job", job)
-		return ctrl.Result{}, err
+func (r *ChatReconciler) PodLog(clientset *kubernetes.Clientset, pod *corev1.Pod) string {
+	podLogOpts := corev1.PodLogOptions{}
+
+	podName := pod.ObjectMeta.Name
+	podNamespace := pod.ObjectMeta.Namespace
+
+	req1 := clientset.CoreV1().Pods(podNamespace).GetLogs(podName, &podLogOpts)
+	podLogs, err := req1.Stream()
+	if err != nil {
+		return ""
 	}
+	defer podLogs.Close()
 
-	log.V(1).Info("created Job for CronJob run", "job", job)
-	return ctrl.Result{}, nil
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return ""
+	}
+	return buf.String()
 }
 
 func (r *ChatReconciler) SetupWithManager(mgr ctrl.Manager) error {
